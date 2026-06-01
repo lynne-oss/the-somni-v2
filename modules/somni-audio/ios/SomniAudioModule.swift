@@ -1,9 +1,18 @@
 import ExpoModulesCore
 import AVFoundation
 
-public class SomniAudioModule: Module, AVAudioPlayerDelegate {
+private class AudioDelegate: NSObject, AVAudioPlayerDelegate {
+  var onFinish: (() -> Void)?
+
+  func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+    onFinish?()
+  }
+}
+
+public class SomniAudioModule: Module {
   private var voicePlayer: AVAudioPlayer?
   private var deltaPlayer: AVAudioPlayer?
+  private var audioDelegate = AudioDelegate()
   private var voiceLoopGapTimer: Timer?
   private var fadeTimer: Timer?
   private var stopTimer: Timer?
@@ -50,6 +59,10 @@ public class SomniAudioModule: Module, AVAudioPlayerDelegate {
       deltaPlayer = dp
     }
 
+    audioDelegate.onFinish = { [weak self] in
+      self?.handleVoiceFinished()
+    }
+
     playVoiceOnce()
 
     fadeTimer = Timer.scheduledTimer(withTimeInterval: 8 * 60, repeats: false) { [weak self] _ in
@@ -64,14 +77,14 @@ public class SomniAudioModule: Module, AVAudioPlayerDelegate {
   private func playVoiceOnce() {
     guard let url = voiceURL, !isFading else { return }
     if let vp = try? AVAudioPlayer(contentsOf: url) {
-      vp.delegate = self
+      vp.delegate = audioDelegate
       vp.volume = 1.0
       vp.play()
       voicePlayer = vp
     }
   }
 
-  public func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+  private func handleVoiceFinished() {
     if isMorning {
       Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
         self?.playMorningVoice()
@@ -111,6 +124,11 @@ public class SomniAudioModule: Module, AVAudioPlayerDelegate {
     isFading = false
     morningCount = 0
     voiceURL = URL(fileURLWithPath: voicePath)
+
+    audioDelegate.onFinish = { [weak self] in
+      self?.handleVoiceFinished()
+    }
+
     playMorningVoice()
   }
 
@@ -120,7 +138,7 @@ public class SomniAudioModule: Module, AVAudioPlayerDelegate {
       return
     }
     if let vp = try? AVAudioPlayer(contentsOf: url) {
-      vp.delegate = self
+      vp.delegate = audioDelegate
       vp.volume = 0.0
       vp.play()
       voicePlayer = vp
@@ -147,6 +165,7 @@ public class SomniAudioModule: Module, AVAudioPlayerDelegate {
     deltaPlayer?.stop()
     voicePlayer = nil
     deltaPlayer = nil
+    audioDelegate.onFinish = nil
     isFading = false
     isMorning = false
     try? AVAudioSession.sharedInstance().setActive(false)

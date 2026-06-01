@@ -13,5 +13,5 @@ yarn-debug.*
 yarn-error.*
 .env
 .env.local
-ios/
-android/
+/ios/
+/android/

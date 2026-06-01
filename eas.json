@@ -1,0 +1,22 @@
+{
+  "cli": {
+    "version": ">= 16.0.0"
+  },
+  "build": {
+    "production": {
+      "ios": {
+        "autoIncrement": true,
+        "distribution": "store"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "lynnestephen1@icloud.com",
+        "ascAppId": "6766691375",
+        "appleTeamId": "NZ84RKKDT7"
+      }
+    }
+  }
+}

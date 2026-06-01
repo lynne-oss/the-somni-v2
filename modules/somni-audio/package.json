@@ -1,0 +1,9 @@
+{
+  "name": "somni-audio",
+  "version": "1.0.0",
+  "description": "Native Swift audio engine for The Somni",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

@@ -3,6 +3,7 @@
     "name": "The Somni",
     "slug": "the-somni-v2",
     "version": "1.0.0",
+    "runtimeVersion": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",

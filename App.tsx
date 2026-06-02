@@ -1,26 +1,65 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import * as Font from 'expo-font';
+import RecordScreen from './RecordScreen';
+import LogScreen from './LogScreen';
 
-export default function App() {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>The Somni</Text>
-      <StatusBar style="light" />
-    </View>
-  );
+type Tab = 'main' | 'log';
+
+interface BoundaryProps { onBack: () => void; children: React.ReactNode; }
+interface BoundaryState { error: Error | null; }
+
+class LogErrorBoundary extends React.Component<BoundaryProps, BoundaryState> {
+  state: BoundaryState = { error: null };
+  static getDerivedStateFromError(error: Error): BoundaryState { return { error }; }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[LogScreen crash]', error.message, '\n', error.stack, '\n', info.componentStack);
+  }
+  render() {
+    const { error } = this.state;
+    if (error) {
+      return (
+        <View style={{ flex: 1, backgroundColor: '#F5F1EB', padding: 28, paddingTop: 60 }}>
+          <TouchableOpacity onPress={this.props.onBack}>
+            <Text style={{ fontSize: 13, color: '#7A7068', marginBottom: 24 }}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={{ fontSize: 13, color: '#cc0000', fontWeight: '600', marginBottom: 8 }}>
+            LogScreen error
+          </Text>
+          <ScrollView>
+            <Text style={{ fontSize: 12, color: '#333', fontFamily: 'monospace' }} selectable>
+              {error.message}{'\n\n'}{error.stack}
+            </Text>
+          </ScrollView>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0B0B0D',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    color: '#F5F1EB',
-    fontSize: 28,
-    fontWeight: '300',
-    letterSpacing: 4,
-  },
-});
+export default function App() {
+  const [tab, setTab] = useState<Tab>('main');
+
+  useEffect(() => {
+    Font.loadAsync({
+      CormorantGaramond_300Light: require('./assets/CormorantGaramond_300Light.ttf'),
+      Inter_300Light: require('./assets/Inter_300Light.ttf'),
+    }).catch(() => {});
+  }, []);
+
+  const goBack = () => setTab('main');
+
+  return (
+    <>
+      <View style={[{ flex: 1 }, tab === 'log' && { display: 'none' }]}>
+        <RecordScreen onShowLog={() => setTab('log')} />
+      </View>
+      {tab === 'log' && (
+        <LogErrorBoundary onBack={goBack}>
+          <LogScreen onBack={goBack} />
+        </LogErrorBoundary>
+      )}
+    </>
+  );
+}

@@ -13,7 +13,6 @@
     "expo-status-bar": "~56.0.4",
     "react": "19.2.3",
     "react-native": "0.85.3",
-    "react-native-background-timer": "^2.4.1",
     "somni-audio": "file:./modules/somni-audio"
   },
   "scripts": {

@@ -13,7 +13,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.thesomni.app",
       "infoPlist": {
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": ["audio"],
+        "NSMicrophoneUsageDescription": "The Somni needs microphone access to record your intention."
       }
     },
     "android": {

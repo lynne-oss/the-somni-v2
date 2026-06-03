@@ -38,6 +38,32 @@ class LogErrorBoundary extends React.Component<BoundaryProps, BoundaryState> {
   }
 }
 
+class RootErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    const { error } = this.state;
+    if (error) {
+      return (
+        <View style={{ flex: 1, backgroundColor: 'red', padding: 28, paddingTop: 60 }}>
+          <Text style={{ color: 'white', fontSize: 14, fontWeight: '600', marginBottom: 12 }}>
+            App crashed
+          </Text>
+          <ScrollView>
+            <Text style={{ color: 'white', fontSize: 11, fontFamily: 'monospace' }} selectable>
+              {(error as Error).message}{'\n\n'}{(error as Error).stack}
+            </Text>
+          </ScrollView>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [tab, setTab] = useState<Tab>('main');
 
@@ -51,15 +77,17 @@ export default function App() {
   const goBack = () => setTab('main');
 
   return (
-    <>
-      <View style={[{ flex: 1 }, tab === 'log' && { display: 'none' }]}>
-        <RecordScreen onShowLog={() => setTab('log')} />
-      </View>
-      {tab === 'log' && (
-        <LogErrorBoundary onBack={goBack}>
-          <LogScreen onBack={goBack} />
-        </LogErrorBoundary>
-      )}
-    </>
+    <RootErrorBoundary>
+      <>
+        <View style={[{ flex: 1 }, tab === 'log' && { display: 'none' }]}>
+          <RecordScreen onShowLog={() => setTab('log')} />
+        </View>
+        {tab === 'log' && (
+          <LogErrorBoundary onBack={goBack}>
+            <LogScreen onBack={goBack} />
+          </LogErrorBoundary>
+        )}
+      </>
+    </RootErrorBoundary>
   );
 }

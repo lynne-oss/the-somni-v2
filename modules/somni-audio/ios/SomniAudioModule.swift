@@ -24,16 +24,22 @@ public class SomniAudioModule: Module {
   public func definition() -> ModuleDefinition {
     Name("SomniAudioModule")
 
-    Function("startBedtime") { (voicePath: String, deltaPath: String) in
-      self.startBedtime(voicePath: voicePath, deltaPath: deltaPath)
+    AsyncFunction("startBedtime") { (voicePath: String, deltaPath: String) in
+      DispatchQueue.main.async {
+        self.startBedtime(voicePath: voicePath, deltaPath: deltaPath)
+      }
     }
 
-    Function("startMorning") { (voicePath: String) in
-      self.startMorning(voicePath: voicePath)
+    AsyncFunction("startMorning") { (voicePath: String) in
+      DispatchQueue.main.async {
+        self.startMorning(voicePath: voicePath)
+      }
     }
 
-    Function("stop") {
-      self.stopAll()
+    AsyncFunction("stop") {
+      DispatchQueue.main.async {
+        self.stopAll()
+      }
     }
   }
 

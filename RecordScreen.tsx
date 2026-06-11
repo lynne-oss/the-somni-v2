@@ -12,8 +12,16 @@ import {
   requestRecordingPermissionsAsync,
   RecordingPresets,
 } from 'expo-audio';
-import * as Notifications from 'expo-notifications';
-import { SchedulableTriggerInputTypes } from 'expo-notifications';
+import {
+  setNotificationHandler,
+  requestPermissionsAsync as requestNotificationPermissionsAsync,
+  getLastNotificationResponseAsync,
+  addNotificationReceivedListener,
+  addNotificationResponseReceivedListener,
+  cancelAllScheduledNotificationsAsync,
+  scheduleNotificationAsync,
+  SchedulableTriggerInputTypes,
+} from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File as EXFile, Paths } from 'expo-file-system';
 import Btn from './Btn';
@@ -51,7 +59,7 @@ function ts() {
   return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}.${String(d.getMilliseconds()).padStart(3,'0')}`;
 }
 
-Notifications.setNotificationHandler({
+setNotificationHandler({
   handleNotification: async (notification) => {
     const isWake = notification.request.content.data?.type === 'waketime';
     return {
@@ -104,7 +112,7 @@ export default function RecordScreen({ onShowLog }: Props) {
     (async () => {
       try {
         await requestRecordingPermissionsAsync();
-        const { granted } = await Notifications.requestPermissionsAsync();
+        const { granted } = await requestNotificationPermissionsAsync();
         if (!mounted.current) return;
         if (!granted) Alert.alert('Notifications disabled', 'Enable notifications for The Somni in iOS Settings.');
         const initMode = { allowsRecording: false, playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'doNotMix' as const };
@@ -117,7 +125,7 @@ export default function RecordScreen({ onShowLog }: Props) {
         if (savedBed)       setBedtime(savedBed);
         if (savedWake)      setWaketime(savedWake);
         if (savedStatement) setWakeStatement(savedStatement);
-        const lastResponse = await Notifications.getLastNotificationResponseAsync();
+        const lastResponse = await getLastNotificationResponseAsync();
         if (!mounted.current) return;
         const launchType = lastResponse?.notification.request.content.data?.type as 'bedtime' | 'waketime' | undefined;
         if (launchType === 'bedtime' && savedUri && loopTypeRef.current === null) {
@@ -169,7 +177,7 @@ export default function RecordScreen({ onShowLog }: Props) {
         }, 60_000);
       } catch {}
     })();
-    const onReceive = Notifications.addNotificationReceivedListener(async (notif) => {
+    const onReceive = addNotificationReceivedListener(async (notif) => {
       try {
         const t = notif.request.content.data?.type as 'bedtime' | 'waketime' | undefined;
         const uri = await AsyncStorage.getItem(REC_URI_KEY);
@@ -192,7 +200,7 @@ export default function RecordScreen({ onShowLog }: Props) {
         }
       } catch {}
     });
-    const onResponse = Notifications.addNotificationResponseReceivedListener(async (resp) => {
+    const onResponse = addNotificationResponseReceivedListener(async (resp) => {
       try {
         const t = resp.notification.request.content.data?.type as 'bedtime' | 'waketime' | undefined;
         const uri = await AsyncStorage.getItem(REC_URI_KEY);
@@ -292,14 +300,14 @@ export default function RecordScreen({ onShowLog }: Props) {
       console.log('[Somni] step 3: calling AsyncStorage.multiSet');
       await AsyncStorage.multiSet([[BEDTIME_KEY, bedtime], [WAKETIME_KEY, waketime]]);
       console.log('[Somni] step 4: calling cancelAllScheduledNotificationsAsync');
-      await Notifications.cancelAllScheduledNotificationsAsync();
+      await cancelAllScheduledNotificationsAsync();
       console.log('[Somni] step 5: calling scheduleNotificationAsync (bedtime), SchedulableTriggerInputTypes=', SchedulableTriggerInputTypes);
-      await Notifications.scheduleNotificationAsync({
+      await scheduleNotificationAsync({
         content: { title: 'Somni — Sleep', body: 'Tap to start your sleep audio.', data: { type: 'bedtime' } },
         trigger: { type: SchedulableTriggerInputTypes.DAILY, hour: bh, minute: bm },
       });
       console.log('[Somni] step 6: calling scheduleNotificationAsync (wake)');
-      await Notifications.scheduleNotificationAsync({
+      await scheduleNotificationAsync({
         content: { title: 'Somni — Wake', body: 'Tap to start your wake audio.', sound: 'default', data: { type: 'waketime' } },
         trigger: { type: SchedulableTriggerInputTypes.DAILY, hour: wh, minute: wm },
       });

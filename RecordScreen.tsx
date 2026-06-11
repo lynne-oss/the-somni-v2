@@ -284,18 +284,24 @@ export default function RecordScreen({ onShowLog }: Props) {
     if ([bh, bm, wh, wm].some(isNaN) || bh > 23 || bm > 59 || wh > 23 || wm > 59) {
       Alert.alert('Invalid time', 'Use 24-hour HH:MM format, e.g. 22:30 or 07:00.'); return;
     }
-    await AsyncStorage.multiSet([[BEDTIME_KEY, bedtime], [WAKETIME_KEY, waketime]]);
-    await Notifications.cancelAllScheduledNotificationsAsync();
-    await Notifications.scheduleNotificationAsync({
-      content: { title: 'Somni — Sleep', body: 'Tap to start your sleep audio.', data: { type: 'bedtime' } },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: bh, minute: bm },
-    });
-    await Notifications.scheduleNotificationAsync({
-      content: { title: 'Somni — Wake', body: 'Tap to start your wake audio.', sound: 'default', data: { type: 'waketime' } },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: wh, minute: wm },
-    });
-    setStatus(`Sleep ${bedtime} · Wake ${waketime}`);
-    Alert.alert('Scheduled', `Sleep ${bedtime}: intention + delta play for 8 min, both fade out by 12 min.\nMorning ${waketime}: tap the notification — plays 5 times then stops.`);
+    try {
+      await AsyncStorage.multiSet([[BEDTIME_KEY, bedtime], [WAKETIME_KEY, waketime]]);
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      await Notifications.scheduleNotificationAsync({
+        content: { title: 'Somni — Sleep', body: 'Tap to start your sleep audio.', data: { type: 'bedtime' } },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: bh, minute: bm },
+      });
+      await Notifications.scheduleNotificationAsync({
+        content: { title: 'Somni — Wake', body: 'Tap to start your wake audio.', sound: 'default', data: { type: 'waketime' } },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: wh, minute: wm },
+      });
+      setStatus(`Sleep ${bedtime} · Wake ${waketime}`);
+      Alert.alert('Scheduled', `Sleep ${bedtime}: intention + delta play for 8 min, both fade out by 12 min.\nMorning ${waketime}: tap the notification — plays 5 times then stops.`);
+    } catch (e: any) {
+      const msg = e?.message ?? String(e) ?? 'Unknown error';
+      Alert.alert('Schedule failed', msg);
+      setStatus(`Schedule error: ${msg}`);
+    }
   }
 
   async function callNetlify(a1: string, a2: string) {

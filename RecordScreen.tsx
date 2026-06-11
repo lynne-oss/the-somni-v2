@@ -13,6 +13,7 @@ import {
   RecordingPresets,
 } from 'expo-audio';
 import * as Notifications from 'expo-notifications';
+import { SchedulableTriggerInputTypes } from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File as EXFile, Paths } from 'expo-file-system';
 import Btn from './Btn';
@@ -289,11 +290,11 @@ export default function RecordScreen({ onShowLog }: Props) {
       await Notifications.cancelAllScheduledNotificationsAsync();
       await Notifications.scheduleNotificationAsync({
         content: { title: 'Somni — Sleep', body: 'Tap to start your sleep audio.', data: { type: 'bedtime' } },
-        trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: bh, minute: bm },
+        trigger: { type: SchedulableTriggerInputTypes.DAILY, hour: bh, minute: bm },
       });
       await Notifications.scheduleNotificationAsync({
         content: { title: 'Somni — Wake', body: 'Tap to start your wake audio.', sound: 'default', data: { type: 'waketime' } },
-        trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: wh, minute: wm },
+        trigger: { type: SchedulableTriggerInputTypes.DAILY, hour: wh, minute: wm },
       });
       setStatus(`Sleep ${bedtime} · Wake ${waketime}`);
       Alert.alert('Scheduled', `Sleep ${bedtime}: intention + delta play for 8 min, both fade out by 12 min.\nMorning ${waketime}: tap the notification — plays 5 times then stops.`);

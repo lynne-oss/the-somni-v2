@@ -279,27 +279,36 @@ export default function RecordScreen({ onShowLog }: Props) {
   }
 
   async function schedule() {
+    console.log('[Somni] schedule() entered');
     if (!hasRecording) { Alert.alert('No recording', 'Record audio first, then schedule.'); return; }
+    console.log('[Somni] step 1: hasRecording ok, parsing times');
     const [bh, bm] = bedtime.split(':').map(Number);
     const [wh, wm] = waketime.split(':').map(Number);
+    console.log('[Somni] step 2: parsed bh=%s bm=%s wh=%s wm=%s', bh, bm, wh, wm);
     if ([bh, bm, wh, wm].some(isNaN) || bh > 23 || bm > 59 || wh > 23 || wm > 59) {
       Alert.alert('Invalid time', 'Use 24-hour HH:MM format, e.g. 22:30 or 07:00.'); return;
     }
     try {
+      console.log('[Somni] step 3: calling AsyncStorage.multiSet');
       await AsyncStorage.multiSet([[BEDTIME_KEY, bedtime], [WAKETIME_KEY, waketime]]);
+      console.log('[Somni] step 4: calling cancelAllScheduledNotificationsAsync');
       await Notifications.cancelAllScheduledNotificationsAsync();
+      console.log('[Somni] step 5: calling scheduleNotificationAsync (bedtime), SchedulableTriggerInputTypes=', SchedulableTriggerInputTypes);
       await Notifications.scheduleNotificationAsync({
         content: { title: 'Somni — Sleep', body: 'Tap to start your sleep audio.', data: { type: 'bedtime' } },
         trigger: { type: SchedulableTriggerInputTypes.DAILY, hour: bh, minute: bm },
       });
+      console.log('[Somni] step 6: calling scheduleNotificationAsync (wake)');
       await Notifications.scheduleNotificationAsync({
         content: { title: 'Somni — Wake', body: 'Tap to start your wake audio.', sound: 'default', data: { type: 'waketime' } },
         trigger: { type: SchedulableTriggerInputTypes.DAILY, hour: wh, minute: wm },
       });
+      console.log('[Somni] step 7: all scheduled, updating status');
       setStatus(`Sleep ${bedtime} · Wake ${waketime}`);
       Alert.alert('Scheduled', `Sleep ${bedtime}: intention + delta play for 8 min, both fade out by 12 min.\nMorning ${waketime}: tap the notification — plays 5 times then stops.`);
     } catch (e: any) {
       const msg = e?.message ?? String(e) ?? 'Unknown error';
+      console.log('[Somni] schedule() caught error at last step reached above:', msg);
       Alert.alert('Schedule failed', msg);
       setStatus(`Schedule error: ${msg}`);
     }

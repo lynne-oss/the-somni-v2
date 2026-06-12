@@ -27,7 +27,7 @@ import { File as EXFile, Paths } from 'expo-file-system';
 import Btn from './Btn';
 import { C } from './theme';
 import { LogEntry, LOG_KEY, DIAG_LOG_KEY } from './types';
-import { startBedtime, startMorning, stop } from './SomniAudio';
+import { startBedtime, startMorning, stop } from 'somni-audio';
 
 const _origLog = console.log.bind(console);
 console.log = (...args: any[]) => {

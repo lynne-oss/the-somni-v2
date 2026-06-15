@@ -107,6 +107,7 @@ export default function RecordScreen({ onShowLog }: Props) {
   }
 
   useEffect(() => {
+    console.log('[Somni] RecordScreen useEffect mounted');
     let timer: ReturnType<typeof setInterval>;
     const mounted = { current: true };
     const lastResponsePromise = getLastNotificationResponseAsync();
@@ -234,7 +235,10 @@ export default function RecordScreen({ onShowLog }: Props) {
     const appStateSub = AppState.addEventListener('change', (state) => {
       console.log('[Somni] AppState ->', state, '| loopType:', loopTypeRef.current, '| waking:', isWakePlayingRef.current);
     });
-    return () => { mounted.current = false; clearInterval(timer); onReceive.remove(); onResponse.remove(); appStateSub.remove(); };
+    return () => {
+      console.log('[Somni] RecordScreen useEffect cleanup');
+      mounted.current = false; clearInterval(timer); onReceive.remove(); onResponse.remove(); appStateSub.remove();
+    };
   }, []);
 
   async function toggleRecording() {

@@ -55,8 +55,8 @@ public class SomniAudioModule: Module {
     isFading = false
     isMorning = false
 
-    voiceURL = URL(fileURLWithPath: voicePath)
-    let deltaURL = URL(fileURLWithPath: deltaPath)
+    voiceURL = URL(string: voicePath)
+    guard let deltaURL = URL(string: deltaPath) else { return }
 
     if let dp = try? AVAudioPlayer(contentsOf: deltaURL) {
       dp.numberOfLoops = -1
@@ -129,7 +129,7 @@ public class SomniAudioModule: Module {
     isMorning = true
     isFading = false
     morningCount = 0
-    voiceURL = URL(fileURLWithPath: voicePath)
+    voiceURL = URL(string: voicePath)
 
     audioDelegate.onFinish = { [weak self] in
       self?.handleVoiceFinished()

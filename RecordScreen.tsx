@@ -112,6 +112,7 @@ export default function RecordScreen({ onShowLog }: Props) {
     const lastResponsePromise = getLastNotificationResponseAsync();
 
     const onResponse = addNotificationResponseReceivedListener(async (resp) => {
+      console.log('[Somni] notif-response received, type:', resp.notification.request.content.data?.type);
       try {
         const t = resp.notification.request.content.data?.type as 'bedtime' | 'waketime' | undefined;
         const uri = await AsyncStorage.getItem(REC_URI_KEY);
@@ -132,7 +133,7 @@ export default function RecordScreen({ onShowLog }: Props) {
           isWakePlayingRef.current = true;
           setStatus('Good morning.');
         }
-      } catch (e) { console.log('[notif-error]', String(e)); }
+      } catch (e) { console.log('[Somni] notif-error', String(e)); }
     });
 
     (async () => {
@@ -151,7 +152,9 @@ export default function RecordScreen({ onShowLog }: Props) {
         if (savedBed)       setBedtime(savedBed);
         if (savedWake)      setWaketime(savedWake);
         if (savedStatement) setWakeStatement(savedStatement);
+        console.log('[Somni] checking lastResponsePromise');
         const lastResponse = await lastResponsePromise;
+        console.log('[Somni] lastResponse type:', lastResponse?.notification.request.content.data?.type);
         if (!mounted.current) return;
         const launchType = lastResponse?.notification.request.content.data?.type as 'bedtime' | 'waketime' | undefined;
         if (launchType === 'bedtime' && savedUri && loopTypeRef.current === null) {
@@ -199,9 +202,9 @@ export default function RecordScreen({ onShowLog }: Props) {
               isWakePlayingRef.current = true;
               setStatus('Good morning.');
             }
-          } catch (e) { console.log('[notif-error]', String(e)); }
+          } catch (e) { console.log('[Somni] notif-error', String(e)); }
         }, 60_000);
-      } catch (e) { console.log('[notif-error]', String(e)); }
+      } catch (e) { console.log('[Somni] notif-error', String(e)); }
     })();
 
     const onReceive = addNotificationReceivedListener(async (notif) => {
@@ -225,7 +228,7 @@ export default function RecordScreen({ onShowLog }: Props) {
           isWakePlayingRef.current = true;
           setStatus('Good morning.');
         }
-      } catch (e) { console.log('[notif-error]', String(e)); }
+      } catch (e) { console.log('[Somni] notif-error', String(e)); }
     });
 
     const appStateSub = AppState.addEventListener('change', (state) => {

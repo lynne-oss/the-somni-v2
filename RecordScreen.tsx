@@ -109,6 +109,32 @@ export default function RecordScreen({ onShowLog }: Props) {
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
     const mounted = { current: true };
+    const lastResponsePromise = getLastNotificationResponseAsync();
+
+    const onResponse = addNotificationResponseReceivedListener(async (resp) => {
+      try {
+        const t = resp.notification.request.content.data?.type as 'bedtime' | 'waketime' | undefined;
+        const uri = await AsyncStorage.getItem(REC_URI_KEY);
+        if (!uri) return;
+        if (t === 'bedtime' && loopTypeRef.current === null) {
+          const { Asset } = await import('expo-asset');
+          const [asset] = await Asset.loadAsync(require('./assets/audio/delta.mp3'));
+          startBedtime(uri, asset.localUri!);
+          loopTypeRef.current = 'bedtime';
+          setIsPlaying(true);
+          setStatus('Playing — fades out from 8 min, silent at 12 min.');
+        }
+        if (t === 'waketime' && loopTypeRef.current === null) {
+          startMorning(uri);
+          loopTypeRef.current = 'waketime';
+          setIsPlaying(true);
+          setIsWakePlaying(true);
+          isWakePlayingRef.current = true;
+          setStatus('Good morning.');
+        }
+      } catch (e) { console.log('[notif-error]', String(e)); }
+    });
+
     (async () => {
       try {
         await requestRecordingPermissionsAsync();
@@ -125,7 +151,7 @@ export default function RecordScreen({ onShowLog }: Props) {
         if (savedBed)       setBedtime(savedBed);
         if (savedWake)      setWaketime(savedWake);
         if (savedStatement) setWakeStatement(savedStatement);
-        const lastResponse = await getLastNotificationResponseAsync();
+        const lastResponse = await lastResponsePromise;
         if (!mounted.current) return;
         const launchType = lastResponse?.notification.request.content.data?.type as 'bedtime' | 'waketime' | undefined;
         if (launchType === 'bedtime' && savedUri && loopTypeRef.current === null) {
@@ -173,10 +199,11 @@ export default function RecordScreen({ onShowLog }: Props) {
               isWakePlayingRef.current = true;
               setStatus('Good morning.');
             }
-          } catch {}
+          } catch (e) { console.log('[notif-error]', String(e)); }
         }, 60_000);
-      } catch {}
+      } catch (e) { console.log('[notif-error]', String(e)); }
     })();
+
     const onReceive = addNotificationReceivedListener(async (notif) => {
       try {
         const t = notif.request.content.data?.type as 'bedtime' | 'waketime' | undefined;
@@ -198,31 +225,9 @@ export default function RecordScreen({ onShowLog }: Props) {
           isWakePlayingRef.current = true;
           setStatus('Good morning.');
         }
-      } catch {}
+      } catch (e) { console.log('[notif-error]', String(e)); }
     });
-    const onResponse = addNotificationResponseReceivedListener(async (resp) => {
-      try {
-        const t = resp.notification.request.content.data?.type as 'bedtime' | 'waketime' | undefined;
-        const uri = await AsyncStorage.getItem(REC_URI_KEY);
-        if (!uri) return;
-        if (t === 'bedtime' && loopTypeRef.current === null) {
-          const { Asset } = await import('expo-asset');
-          const [asset] = await Asset.loadAsync(require('./assets/audio/delta.mp3'));
-          startBedtime(uri, asset.localUri!);
-          loopTypeRef.current = 'bedtime';
-          setIsPlaying(true);
-          setStatus('Playing — fades out from 8 min, silent at 12 min.');
-        }
-        if (t === 'waketime' && loopTypeRef.current === null) {
-          startMorning(uri);
-          loopTypeRef.current = 'waketime';
-          setIsPlaying(true);
-          setIsWakePlaying(true);
-          isWakePlayingRef.current = true;
-          setStatus('Good morning.');
-        }
-      } catch {}
-    });
+
     const appStateSub = AppState.addEventListener('change', (state) => {
       console.log('[Somni] AppState ->', state, '| loopType:', loopTypeRef.current, '| waking:', isWakePlayingRef.current);
     });

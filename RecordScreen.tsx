@@ -27,7 +27,7 @@ import { File as EXFile, Paths } from 'expo-file-system';
 import Btn from './Btn';
 import { C } from './theme';
 import { LogEntry, LOG_KEY, DIAG_LOG_KEY } from './types';
-import { startBedtime, startMorning, stop } from 'somni-audio';
+import { startBedtime, startMorning, stop, addSessionEndListener } from 'somni-audio';
 
 const _origLog = console.log.bind(console);
 console.log = (...args: any[]) => {
@@ -237,9 +237,19 @@ export default function RecordScreen({ onShowLog }: Props) {
     const appStateSub = AppState.addEventListener('change', (state) => {
       console.log('[Somni] AppState ->', state, '| loopType:', loopTypeRef.current, '| waking:', isWakePlayingRef.current);
     });
+
+    const sessionEndSub = addSessionEndListener((event) => {
+      console.log('[Somni] session ended, type:', event.type);
+      loopTypeRef.current = null;
+      setIsPlaying(false);
+      setIsWakePlaying(false);
+      isWakePlayingRef.current = false;
+      setStatus('Session complete. Ready to schedule.');
+    });
+
     return () => {
       console.log('[Somni] RecordScreen useEffect cleanup');
-      mounted.current = false; clearInterval(timer); onReceive.remove(); onResponse.remove(); appStateSub.remove();
+      mounted.current = false; clearInterval(timer); onReceive.remove(); onResponse.remove(); appStateSub.remove(); sessionEndSub.remove();
     };
   }, []);
 

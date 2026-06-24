@@ -41,6 +41,8 @@ public class SomniAudioModule: Module {
         self.stopAll()
       }
     }
+
+    Events("onSessionEnd")
   }
 
   private func activateAudioSession() {
@@ -77,6 +79,7 @@ public class SomniAudioModule: Module {
 
     stopTimer = Timer.scheduledTimer(withTimeInterval: 12 * 60, repeats: false) { [weak self] _ in
       self?.stopAll()
+      self?.sendEvent("onSessionEnd", ["type": "bedtime"])
     }
   }
 
@@ -107,18 +110,18 @@ public class SomniAudioModule: Module {
     voiceLoopGapTimer?.invalidate()
     voiceLoopGapTimer = nil
 
-    guard let player = voicePlayer else { return }
     let steps: Double = 96
     let interval = duration / steps
     var step = 0
 
     fadeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
+      guard let self = self else { timer.invalidate(); return }
       step += 1
-      player.volume = max(0, Float(1.0 - Double(step) / steps))
+      self.voicePlayer?.volume = max(0, Float(1.0 - Double(step) / steps))
       if step >= Int(steps) {
         timer.invalidate()
-        self?.voicePlayer?.stop()
-        self?.voicePlayer = nil
+        self.voicePlayer?.stop()
+        self.voicePlayer = nil
       }
     }
   }
@@ -141,6 +144,7 @@ public class SomniAudioModule: Module {
   private func playMorningVoice() {
     guard morningCount < 5, let url = voiceURL else {
       stopAll()
+      sendEvent("onSessionEnd", ["type": "waketime"])
       return
     }
     if let vp = try? AVAudioPlayer(contentsOf: url) {

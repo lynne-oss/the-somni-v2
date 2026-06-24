@@ -113,11 +113,15 @@ public class SomniAudioModule: Module {
     let steps: Double = 96
     let interval = duration / steps
     var step = 0
+    let initialVoiceVolume = voicePlayer?.volume ?? 1.0
+    let initialDeltaVolume = deltaPlayer?.volume ?? 0.3
 
     fadeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
       guard let self = self else { timer.invalidate(); return }
       step += 1
-      self.voicePlayer?.volume = max(0, Float(1.0 - Double(step) / steps))
+      let fraction = max(0, Float(1.0 - Double(step) / steps))
+      self.voicePlayer?.volume = initialVoiceVolume * fraction
+      self.deltaPlayer?.volume = initialDeltaVolume * fraction
       if step >= Int(steps) {
         timer.invalidate()
         self.voicePlayer?.stop()

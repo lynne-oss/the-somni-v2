@@ -109,6 +109,7 @@ public class SomniAudioModule: Module {
     isFading = true
     voiceLoopGapTimer?.invalidate()
     voiceLoopGapTimer = nil
+    voicePlayer?.numberOfLoops = -1
 
     let steps: Double = 96
     let interval = duration / steps

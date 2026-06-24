@@ -113,6 +113,7 @@ export default function RecordScreen({ onShowLog }: Props) {
     const lastResponsePromise = getLastNotificationResponseAsync();
 
     const onResponse = addNotificationResponseReceivedListener(async (resp) => {
+      console.log('[Somni] notification response handler fired');
       console.log('[Somni] notif-response received, type:', resp.notification.request.content.data?.type);
       try {
         const t = resp.notification.request.content.data?.type as 'bedtime' | 'waketime' | undefined;
@@ -153,6 +154,7 @@ export default function RecordScreen({ onShowLog }: Props) {
         if (savedBed)       setBedtime(savedBed);
         if (savedWake)      setWaketime(savedWake);
         if (savedStatement) setWakeStatement(savedStatement);
+        console.log('[Somni] notification response handler fired');
         console.log('[Somni] checking lastResponsePromise');
         const lastResponse = await lastResponsePromise;
         console.log('[Somni] lastResponse type:', lastResponse?.notification.request.content.data?.type);

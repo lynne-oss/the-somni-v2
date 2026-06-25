@@ -111,6 +111,8 @@ public class SomniAudioModule: Module {
     voiceLoopGapTimer = nil
 
     let capturedVoice = voicePlayer
+    capturedVoice?.numberOfLoops = -1
+
     let steps: Double = 96
     let interval = duration / steps
     var step = 0
@@ -125,6 +127,7 @@ public class SomniAudioModule: Module {
       self.deltaPlayer?.volume = initialDeltaVolume * fraction
       if step >= Int(steps) {
         timer.invalidate()
+        capturedVoice?.numberOfLoops = 0
         capturedVoice?.stop()
       }
     }

@@ -109,24 +109,23 @@ public class SomniAudioModule: Module {
     isFading = true
     voiceLoopGapTimer?.invalidate()
     voiceLoopGapTimer = nil
-    voicePlayer?.numberOfLoops = -1
 
+    let capturedVoice = voicePlayer
     let steps: Double = 96
     let interval = duration / steps
     var step = 0
-    let initialVoiceVolume = voicePlayer?.volume ?? 1.0
+    let initialVoiceVolume = capturedVoice?.volume ?? 1.0
     let initialDeltaVolume = deltaPlayer?.volume ?? 0.3
 
     fadeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
       guard let self = self else { timer.invalidate(); return }
       step += 1
       let fraction = max(0, Float(1.0 - Double(step) / steps))
-      self.voicePlayer?.volume = initialVoiceVolume * fraction
+      capturedVoice?.volume = initialVoiceVolume * fraction
       self.deltaPlayer?.volume = initialDeltaVolume * fraction
       if step >= Int(steps) {
         timer.invalidate()
-        self.voicePlayer?.stop()
-        self.voicePlayer = nil
+        capturedVoice?.stop()
       }
     }
   }

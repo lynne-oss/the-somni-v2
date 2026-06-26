@@ -110,8 +110,16 @@ public class SomniAudioModule: Module {
     voiceLoopGapTimer?.invalidate()
     voiceLoopGapTimer = nil
 
+    // If voice is in its gap (voicePlayer is nil), start it now so we have something to fade.
+    if voicePlayer == nil, let url = voiceURL, let vp = try? AVAudioPlayer(contentsOf: url) {
+      vp.volume = 1.0
+      vp.numberOfLoops = -1
+      vp.play()
+      voicePlayer = vp
+    } else {
+      voicePlayer?.numberOfLoops = -1
+    }
     let capturedVoice = voicePlayer
-    capturedVoice?.numberOfLoops = -1
 
     let steps: Double = 96
     let interval = duration / steps

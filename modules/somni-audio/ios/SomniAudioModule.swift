@@ -17,6 +17,7 @@ public class SomniAudioModule: Module {
   private var fadeTimer: Timer?
   private var stopTimer: Timer?
   private var voiceURL: URL?
+  private var voiceData: Data?
   private var isFading = false
   private var isMorning = false
   private var morningCount = 0
@@ -60,6 +61,7 @@ public class SomniAudioModule: Module {
     isMorning = false
 
     voiceURL = URL(string: voicePath)
+    voiceData = voiceURL.flatMap { try? Data(contentsOf: $0) }
     guard let deltaURL = URL(string: deltaPath) else { return }
 
     if let dp = try? AVAudioPlayer(contentsOf: deltaURL) {
@@ -104,8 +106,8 @@ public class SomniAudioModule: Module {
   }
 
   private func playVoiceOnce() {
-    guard let url = voiceURL, !isFading else { return }
-    if let vp = try? AVAudioPlayer(contentsOf: url) {
+    guard let data = voiceData, !isFading else { return }
+    if let vp = try? AVAudioPlayer(data: data) {
       vp.delegate = audioDelegate
       vp.volume = 1.0
       vp.play()
@@ -134,7 +136,7 @@ public class SomniAudioModule: Module {
     voicePlayer?.delegate = nil
 
     // If voice is in its gap (voicePlayer is nil), start it now so we have something to fade.
-    if voicePlayer == nil, let url = voiceURL, let vp = try? AVAudioPlayer(contentsOf: url) {
+    if voicePlayer == nil, let data = voiceData, let vp = try? AVAudioPlayer(data: data) {
       vp.volume = 1.0
       vp.numberOfLoops = -1
       vp.play()
@@ -215,6 +217,7 @@ public class SomniAudioModule: Module {
     voicePlayer = nil
     deltaPlayer = nil
     fadingVoice = nil
+    voiceData = nil
     if let obs = interruptionObserver {
       NotificationCenter.default.removeObserver(obs)
       interruptionObserver = nil

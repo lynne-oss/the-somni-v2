@@ -20,6 +20,8 @@ public class SomniAudioModule: Module {
   private var isFading = false
   private var isMorning = false
   private var morningCount = 0
+  private var fadingVoice: AVAudioPlayer?
+  private var interruptionObserver: NSObjectProtocol?
 
   public func definition() -> ModuleDefinition {
     Name("SomniAudioModule")
@@ -73,6 +75,24 @@ public class SomniAudioModule: Module {
 
     playVoiceOnce()
 
+    interruptionObserver = NotificationCenter.default.addObserver(
+      forName: AVAudioSession.interruptionNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] notification in
+      guard let self = self,
+            let info = notification.userInfo,
+            let typeValue = info[AVAudioSessionInterruptionTypeKey] as? UInt,
+            AVAudioSession.InterruptionType(rawValue: typeValue) == .ended else { return }
+      self.activateAudioSession()
+      if self.isFading {
+        self.fadingVoice?.play()
+      } else {
+        self.voicePlayer?.play()
+      }
+      self.deltaPlayer?.play()
+    }
+
     fadeTimer = Timer.scheduledTimer(withTimeInterval: 8 * 60, repeats: false) { [weak self] _ in
       self?.fadeOutVoice(duration: 4 * 60)
     }
@@ -110,6 +130,9 @@ public class SomniAudioModule: Module {
     voiceLoopGapTimer?.invalidate()
     voiceLoopGapTimer = nil
 
+    // Detach delegate so audioPlayerDidFinishPlaying cannot fire and stop the player mid-fade.
+    voicePlayer?.delegate = nil
+
     // If voice is in its gap (voicePlayer is nil), start it now so we have something to fade.
     if voicePlayer == nil, let url = voiceURL, let vp = try? AVAudioPlayer(contentsOf: url) {
       vp.volume = 1.0
@@ -120,6 +143,7 @@ public class SomniAudioModule: Module {
       voicePlayer?.numberOfLoops = -1
     }
     let capturedVoice = voicePlayer
+    fadingVoice = capturedVoice
 
     let steps: Double = 96
     let interval = duration / steps
@@ -190,6 +214,11 @@ public class SomniAudioModule: Module {
     deltaPlayer?.stop()
     voicePlayer = nil
     deltaPlayer = nil
+    fadingVoice = nil
+    if let obs = interruptionObserver {
+      NotificationCenter.default.removeObserver(obs)
+      interruptionObserver = nil
+    }
     audioDelegate.onFinish = nil
     isFading = false
     isMorning = false

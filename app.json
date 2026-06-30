@@ -13,8 +13,11 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.thesomni.app",
       "infoPlist": {
-        "UIBackgroundModes": ["audio"],
-        "NSMicrophoneUsageDescription": "The Somni needs microphone access to record your intention."
+        "UIBackgroundModes": [
+          "audio"
+        ],
+        "NSMicrophoneUsageDescription": "The Somni needs microphone access to record your intention.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -25,6 +28,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "dbd179a9-26b3-42c4-a6ce-29953aa0fb5c"
+      }
     }
   }
 }

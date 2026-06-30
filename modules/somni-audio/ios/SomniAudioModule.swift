@@ -107,17 +107,30 @@ public class SomniAudioModule: Module {
     voiceLoopGapTimer?.invalidate()
     voiceLoopGapTimer = nil
 
-    guard let player = voicePlayer else { return }
+    // If we're in a loop gap the current player has already finished and is silent.
+    // Start one final play so there is live audio to fade rather than fading a dead player.
+    let playerToFade: AVAudioPlayer
+    if let existing = voicePlayer, existing.isPlaying {
+      playerToFade = existing
+    } else if let url = voiceURL, let fresh = try? AVAudioPlayer(contentsOf: url) {
+      fresh.volume = 1.0
+      fresh.play()
+      voicePlayer = fresh
+      playerToFade = fresh
+    } else {
+      return
+    }
+
     let steps: Double = 96
     let interval = duration / steps
     var step = 0
 
     fadeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
       step += 1
-      player.volume = max(0, Float(1.0 - Double(step) / steps))
+      playerToFade.volume = max(0, Float(1.0 - Double(step) / steps))
       if step >= Int(steps) {
         timer.invalidate()
-        self?.voicePlayer?.stop()
+        playerToFade.stop()
         self?.voicePlayer = nil
       }
     }

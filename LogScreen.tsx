@@ -29,9 +29,19 @@ interface Props {
 }
 
 export default function LogScreen({ onBack }: Props) {
-  const [tab,       setTab]       = useState<Tab>('intentions');
-  const [entries,   setEntries]   = useState<LogEntry[]>([]);
-  const [diagLines, setDiagLines] = useState<string[]>([]);
+  const [tab,         setTab]         = useState<Tab>('intentions');
+  const [entries,     setEntries]     = useState<LogEntry[]>([]);
+  const [diagLines,   setDiagLines]   = useState<string[]>([]);
+  const [titleTaps,   setTitleTaps]   = useState(0);
+  const [diagUnlocked, setDiagUnlocked] = useState(false);
+
+  function handleTitleTap() {
+    const next = titleTaps + 1;
+    setTitleTaps(next);
+    if (next >= 5) {
+      setDiagUnlocked(true);
+    }
+  }
 
   useEffect(() => {
     AsyncStorage.getItem(LOG_KEY)
@@ -64,7 +74,9 @@ export default function LogScreen({ onBack }: Props) {
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={s.inner} showsVerticalScrollIndicator={false}>
         <View style={s.headerRow}>
-          <Text style={s.title}>{tab === 'intentions' ? 'Intentions' : 'Diagnostics'}</Text>
+          <TouchableOpacity onPress={handleTitleTap} activeOpacity={1}>
+            <Text style={s.title}>{tab === 'intentions' ? 'Intentions' : 'Diagnostics'}</Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={onBack} activeOpacity={0.6} style={s.backWrap}>
             <Text style={s.back}>← Back</Text>
           </TouchableOpacity>
@@ -74,9 +86,11 @@ export default function LogScreen({ onBack }: Props) {
           <TouchableOpacity onPress={() => setTab('intentions')} activeOpacity={0.6} style={[s.tab, tab === 'intentions' && s.tabActive]}>
             <Text style={[s.tabLabel, tab === 'intentions' && s.tabLabelActive]}>Intentions</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => { setTab('diagnostics'); loadDiag(); }} activeOpacity={0.6} style={[s.tab, tab === 'diagnostics' && s.tabActive]}>
-            <Text style={[s.tabLabel, tab === 'diagnostics' && s.tabLabelActive]}>Diagnostics</Text>
-          </TouchableOpacity>
+          {diagUnlocked && (
+            <TouchableOpacity onPress={() => { setTab('diagnostics'); loadDiag(); }} activeOpacity={0.6} style={[s.tab, tab === 'diagnostics' && s.tabActive]}>
+              <Text style={[s.tabLabel, tab === 'diagnostics' && s.tabLabelActive]}>Diagnostics</Text>
+            </TouchableOpacity>
+          )}
         </View>
         {tab === 'intentions' && (
           entries.length === 0 ? (

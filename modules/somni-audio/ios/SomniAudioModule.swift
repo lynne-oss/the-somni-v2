@@ -92,7 +92,7 @@ public class SomniAudioModule: Module {
 
   private func handleVoiceFinished() {
     if isMorning {
-      Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
+      Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { [weak self] _ in
         self?.playMorningVoice()
       }
     } else if !isFading {

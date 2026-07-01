@@ -55,8 +55,8 @@ public class SomniAudioModule: Module {
     isFading = false
     isMorning = false
 
-    voiceURL = URL(string: voicePath) ?? URL(fileURLWithPath: voicePath)
-    guard let deltaURL = URL(string: deltaPath) ?? URL(fileURLWithPath: deltaPath) else { return }
+    voiceURL = URL(string: voicePath)
+    guard let deltaURL = URL(string: deltaPath) else { return }
 
     if let dp = try? AVAudioPlayer(contentsOf: deltaURL) {
       dp.numberOfLoops = -1
@@ -92,7 +92,7 @@ public class SomniAudioModule: Module {
 
   private func handleVoiceFinished() {
     if isMorning {
-      Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { [weak self] _ in
+      Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
         self?.playMorningVoice()
       }
     } else if !isFading {
@@ -107,10 +107,19 @@ public class SomniAudioModule: Module {
     voiceLoopGapTimer?.invalidate()
     voiceLoopGapTimer = nil
 
-    // Only fade if the voice is actively playing. If we're in the 10-second loop gap
-    // the voice is already silent — isFading=true will block the pending gap timer
-    // from starting another play, so no action needed.
-    guard let player = voicePlayer, player.isPlaying else { return }
+    // If we're in a loop gap the current player has already finished and is silent.
+    // Start one final play so there is live audio to fade rather than fading a dead player.
+    let playerToFade: AVAudioPlayer
+    if let existing = voicePlayer, existing.isPlaying {
+      playerToFade = existing
+    } else if let url = voiceURL, let fresh = try? AVAudioPlayer(contentsOf: url) {
+      fresh.volume = 1.0
+      fresh.play()
+      voicePlayer = fresh
+      playerToFade = fresh
+    } else {
+      return
+    }
 
     let steps: Double = 96
     let interval = duration / steps
@@ -118,10 +127,10 @@ public class SomniAudioModule: Module {
 
     fadeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
       step += 1
-      player.volume = max(0, Float(1.0 - Double(step) / steps))
+      playerToFade.volume = max(0, Float(1.0 - Double(step) / steps))
       if step >= Int(steps) {
         timer.invalidate()
-        player.stop()
+        playerToFade.stop()
         self?.voicePlayer = nil
       }
     }
@@ -133,7 +142,7 @@ public class SomniAudioModule: Module {
     isMorning = true
     isFading = false
     morningCount = 0
-    voiceURL = URL(string: voicePath) ?? URL(fileURLWithPath: voicePath)
+    voiceURL = URL(string: voicePath)
 
     audioDelegate.onFinish = { [weak self] in
       self?.handleVoiceFinished()

@@ -1,6 +1,6 @@
-import { NativeModulesProxy } from 'expo-modules-core';
+import { requireNativeModule } from 'expo-modules-core';
 
-const SomniAudio = NativeModulesProxy.SomniAudioModule;
+const SomniAudio = requireNativeModule('SomniAudioModule');
 
 export function startBedtime(voicePath: string, deltaPath: string): Promise<void> {
   return SomniAudio.startBedtime(voicePath, deltaPath);

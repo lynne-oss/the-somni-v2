@@ -166,14 +166,14 @@ export default function RecordScreen({ onShowLog }: Props) {
           setIsPlaying(true);
           setStatus('Playing — fades out from 8 min, silent at 12 min.');
         }
-        if (launchType === 'waketime' && savedUri && loopTypeRef.current === null) {
-          startMorning(savedUri);
-          loopTypeRef.current = 'waketime';
-          setIsPlaying(true);
+        if (launchType === 'waketime' && loopTypeRef.current === null) {
+          if (savedStatement) setWakeStatement(savedStatement);
           setIsWakePlaying(true);
           isWakePlayingRef.current = true;
-          setStatus('Good morning.');
+          if (savedUri) startMorning(savedUri);
         }
+
+
         timer = setInterval(async () => {
           if (!mounted.current) return;
           try {
@@ -480,3 +480,6 @@ const s = StyleSheet.create({
   wakeRule: { width: '100%', height: 1, backgroundColor: '#D8D2C8', marginBottom: 40 },
   wakeStatement: { fontFamily: 'CormorantGaramond_300Light', fontWeight: '300', fontSize: 26, color: '#0B0B0D', lineHeight: 38, letterSpacing: 0.5, textAlign: 'center', paddingHorizontal: 8 },
 });
+
+
+

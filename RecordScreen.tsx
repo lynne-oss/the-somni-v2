@@ -102,7 +102,7 @@ export default function RecordScreen({ onShowLog }: Props) {
     await stop();
     setIsPlaying(false);
     setIsWakePlaying(false);
-    isWakePlayingRef.current = false;
+    loopTypeRef.current = null;
     setStatus('Stopped.');
   }
 
@@ -125,6 +125,7 @@ export default function RecordScreen({ onShowLog }: Props) {
           loopTypeRef.current = 'bedtime';
           setIsPlaying(true);
           setStatus('Playing — fades out from 8 min, silent at 12 min.');
+          setTimeout(() => { loopTypeRef.current = null; }, 12 * 60 * 1000);
         }
         if (t === 'waketime' && loopTypeRef.current === null) {
           startMorning(uri);
@@ -164,6 +165,7 @@ export default function RecordScreen({ onShowLog }: Props) {
           startBedtime(savedUri, asset.localUri!);
           loopTypeRef.current = 'bedtime';
           setIsPlaying(true);
+          setTimeout(() => { loopTypeRef.current = null; }, 12 * 60 * 1000);
           setStatus('Playing — fades out from 8 min, silent at 12 min.');
         }
         if (launchType === 'waketime' && loopTypeRef.current === null) {
@@ -193,6 +195,7 @@ export default function RecordScreen({ onShowLog }: Props) {
               loopTypeRef.current = 'bedtime';
               setIsPlaying(true);
               setStatus('Playing — fades out from 8 min, silent at 12 min.');
+              setTimeout(() => { loopTypeRef.current = null; }, 12 * 60 * 1000);
             }
             if (uri && hhmm === wake && loopTypeRef.current === null) {
               lastPlayedRef.current = hhmm;
@@ -219,6 +222,7 @@ export default function RecordScreen({ onShowLog }: Props) {
           startBedtime(uri, asset.localUri!);
           loopTypeRef.current = 'bedtime';
           setIsPlaying(true);
+          setTimeout(() => { loopTypeRef.current = null; }, 12 * 60 * 1000);
           setStatus('Playing — fades out from 8 min, silent at 12 min.');
         }
         if (t === 'waketime' && loopTypeRef.current === null) {

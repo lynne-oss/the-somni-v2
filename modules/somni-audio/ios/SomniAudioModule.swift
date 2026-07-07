@@ -1,4 +1,4 @@
-Good. Paste this entire block into Notepad exactly as it appears — from the very first line to the very last }:
+Good. Now paste this exactly — nothing before "import" and nothing after the final }:
 import ExpoModulesCore
 import AVFoundation
 

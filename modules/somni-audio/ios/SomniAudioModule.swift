@@ -1,3 +1,4 @@
+Good. Paste this entire block into Notepad exactly as it appears — from the very first line to the very last }:
 import ExpoModulesCore
 import AVFoundation
 
@@ -18,8 +19,6 @@ public class SomniAudioModule: Module {
   private var stopTimer: Timer?
   private var voiceURL: URL?
   private var isFading = false
-  private var isMorning = false
-  private var morningCount = 0
 
   public func definition() -> ModuleDefinition {
     Name("SomniAudioModule")
@@ -31,9 +30,7 @@ public class SomniAudioModule: Module {
     }
 
     AsyncFunction("startMorning") { (voicePath: String) in
-      DispatchQueue.main.async {
-        self.startMorning(voicePath: voicePath)
-      }
+      // Morning is screen-only. No audio.
     }
 
     AsyncFunction("stop") {
@@ -53,7 +50,6 @@ public class SomniAudioModule: Module {
     stopAll()
     activateAudioSession()
     isFading = false
-    isMorning = false
 
     voiceURL = URL(string: voicePath) ?? URL(fileURLWithPath: voicePath)
     let deltaURL = URL(string: deltaPath) ?? URL(fileURLWithPath: deltaPath)
@@ -91,14 +87,9 @@ public class SomniAudioModule: Module {
   }
 
   private func handleVoiceFinished() {
-    if isMorning {
-      Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
-        self?.playMorningVoice()
-      }
-    } else if !isFading {
-      voiceLoopGapTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { [weak self] _ in
-        self?.playVoiceOnce()
-      }
+    guard !isFading else { return }
+    voiceLoopGapTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { [weak self] _ in
+      self?.playVoiceOnce()
     }
   }
 
@@ -107,55 +98,29 @@ public class SomniAudioModule: Module {
     voiceLoopGapTimer?.invalidate()
     voiceLoopGapTimer = nil
 
-    guard let player = voicePlayer else { return }
+    let playerToFade: AVAudioPlayer
+    if let existing = voicePlayer, existing.isPlaying {
+      playerToFade = existing
+    } else if let url = voiceURL, let fresh = try? AVAudioPlayer(contentsOf: url) {
+      fresh.volume = 1.0
+      fresh.play()
+      voicePlayer = fresh
+      playerToFade = fresh
+    } else {
+      return
+    }
+
     let steps: Double = 96
     let interval = duration / steps
     var step = 0
 
     fadeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
       step += 1
-      player.volume = max(0, Float(1.0 - Double(step) / steps))
+      playerToFade.volume = max(0, Float(1.0 - Double(step) / steps))
       if step >= Int(steps) {
         timer.invalidate()
-        self?.voicePlayer?.stop()
+        playerToFade.stop()
         self?.voicePlayer = nil
-      }
-    }
-  }
-
-  private func startMorning(voicePath: String) {
-    stopAll()
-    activateAudioSession()
-    isMorning = true
-    isFading = false
-    morningCount = 0
-    voiceURL = URL(string: voicePath) ?? URL(fileURLWithPath: voicePath)
-
-    audioDelegate.onFinish = { [weak self] in
-      self?.handleVoiceFinished()
-    }
-
-    playMorningVoice()
-  }
-
-  private func playMorningVoice() {
-    guard morningCount < 5, let url = voiceURL else {
-      stopAll()
-      return
-    }
-    if let vp = try? AVAudioPlayer(contentsOf: url) {
-      vp.delegate = audioDelegate
-      vp.volume = 0.0
-      vp.play()
-      voicePlayer = vp
-      morningCount += 1
-
-      let steps = 30
-      var step = 0
-      Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { timer in
-        step += 1
-        vp.volume = min(0.7, 0.7 * Float(step) / Float(steps))
-        if step >= steps { timer.invalidate() }
       }
     }
   }
@@ -173,7 +138,6 @@ public class SomniAudioModule: Module {
     deltaPlayer = nil
     audioDelegate.onFinish = nil
     isFading = false
-    isMorning = false
     try? AVAudioSession.sharedInstance().setActive(false)
   }
 }

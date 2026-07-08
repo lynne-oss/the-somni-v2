@@ -1,3 +1,4 @@
+
 import ExpoModulesCore
 import AVFoundation
 
@@ -14,10 +15,11 @@ public class SomniAudioModule: Module {
   private var deltaPlayer: AVAudioPlayer?
   private var audioDelegate = AudioDelegate()
   private var voiceLoopGapTimer: Timer?
-  private var fadeTimer: Timer?
+  private var fadeStartTimer: Timer?
+  private var fadeStepTimer: Timer?
   private var stopTimer: Timer?
   private var voiceURL: URL?
-  private var isFading = false
+  private var fadeLevel: Float = 1.0
 
   public func definition() -> ModuleDefinition {
     Name("SomniAudioModule")
@@ -48,7 +50,7 @@ public class SomniAudioModule: Module {
   private func startBedtime(voicePath: String, deltaPath: String) {
     stopAll()
     activateAudioSession()
-    isFading = false
+    fadeLevel = 1.0
 
     voiceURL = URL(string: voicePath) ?? URL(fileURLWithPath: voicePath)
     let deltaURL = URL(string: deltaPath) ?? URL(fileURLWithPath: deltaPath)
@@ -66,8 +68,8 @@ public class SomniAudioModule: Module {
 
     playVoiceOnce()
 
-    fadeTimer = Timer.scheduledTimer(withTimeInterval: 8 * 60, repeats: false) { [weak self] _ in
-      self?.fadeOutVoice(duration: 4 * 60)
+    fadeStartTimer = Timer.scheduledTimer(withTimeInterval: 8 * 60, repeats: false) { [weak self] _ in
+      self?.beginFade(duration: 4 * 60)
     }
 
     stopTimer = Timer.scheduledTimer(withTimeInterval: 12 * 60, repeats: false) { [weak self] _ in
@@ -76,67 +78,60 @@ public class SomniAudioModule: Module {
   }
 
   private func playVoiceOnce() {
-    guard let url = voiceURL, !isFading else { return }
+    guard let url = voiceURL, fadeLevel > 0 else { return }
     if let vp = try? AVAudioPlayer(contentsOf: url) {
       vp.delegate = audioDelegate
-      vp.volume = 1.0
+      vp.volume = fadeLevel
       vp.play()
       voicePlayer = vp
     }
   }
 
   private func handleVoiceFinished() {
-    guard !isFading else { return }
+    guard fadeLevel > 0 else { return }
     voiceLoopGapTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: false) { [weak self] _ in
       self?.playVoiceOnce()
     }
   }
 
-  private func fadeOutVoice(duration: TimeInterval) {
-    isFading = true
-    voiceLoopGapTimer?.invalidate()
-    voiceLoopGapTimer = nil
-
-    let playerToFade: AVAudioPlayer
-    if let existing = voicePlayer, existing.isPlaying {
-      playerToFade = existing
-    } else if let url = voiceURL, let fresh = try? AVAudioPlayer(contentsOf: url) {
-      fresh.volume = 1.0
-      fresh.play()
-      voicePlayer = fresh
-      playerToFade = fresh
-    } else {
-      return
-    }
-
-    let steps: Double = 96
+  private func beginFade(duration: TimeInterval) {
+    let steps: Double = 240
     let interval = duration / steps
     var step = 0
 
-    fadeTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
+    fadeStepTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
+      guard let self = self else { timer.invalidate(); return }
       step += 1
-      playerToFade.volume = max(0, Float(1.0 - Double(step) / steps))
+      self.fadeLevel = max(0, Float(1.0 - Double(step) / steps))
+
+      if let vp = self.voicePlayer, vp.isPlaying {
+        vp.volume = self.fadeLevel
+      }
+      if let dp = self.deltaPlayer {
+        dp.volume = 0.3 * self.fadeLevel
+      }
+
       if step >= Int(steps) {
         timer.invalidate()
-        playerToFade.stop()
-        self?.voicePlayer = nil
       }
     }
   }
 
   private func stopAll() {
     voiceLoopGapTimer?.invalidate()
-    fadeTimer?.invalidate()
+    fadeStartTimer?.invalidate()
+    fadeStepTimer?.invalidate()
     stopTimer?.invalidate()
     voiceLoopGapTimer = nil
-    fadeTimer = nil
+    fadeStartTimer = nil
+    fadeStepTimer = nil
     stopTimer = nil
     voicePlayer?.stop()
     deltaPlayer?.stop()
     voicePlayer = nil
     deltaPlayer = nil
     audioDelegate.onFinish = nil
-    isFading = false
+    fadeLevel = 1.0
     try? AVAudioSession.sharedInstance().setActive(false)
   }
 }

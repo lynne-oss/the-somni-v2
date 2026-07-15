@@ -423,10 +423,10 @@ export default function RecordScreen({ onShowLog }: Props) {
               <Text style={s.resultLabel}>Your signal</Text>
               <Text style={s.resultStatement}>{'"'}{statement}{'"'}</Text>
               <View style={{ marginTop: 20 }}>
-                <Btn label="Make it simpler" onPress={handleSimplify} />
+                <Btn label="Regenerate" onPress={handleSimplify} />
               </View>
               <View style={{ marginTop: 12 }}>
-                <Btn label="Try again" onPress={handleTryAgain} />
+                <Btn label="Start over" onPress={handleTryAgain} />
               </View>
             </>
           )}
@@ -484,6 +484,7 @@ const s = StyleSheet.create({
   wakeRule: { width: '100%', height: 1, backgroundColor: '#D8D2C8', marginBottom: 40 },
   wakeStatement: { fontFamily: 'CormorantGaramond_300Light', fontWeight: '300', fontSize: 26, color: '#0B0B0D', lineHeight: 38, letterSpacing: 0.5, textAlign: 'center', paddingHorizontal: 8 },
 });
+
 
 
 

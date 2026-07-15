@@ -319,12 +319,12 @@ export default function RecordScreen({ onShowLog }: Props) {
       await cancelAllScheduledNotificationsAsync();
       console.log('[Somni] step 5: calling scheduleNotificationAsync (bedtime), SchedulableTriggerInputTypes=', SchedulableTriggerInputTypes);
       await scheduleNotificationAsync({
-        content: { title: 'Somni — Sleep', body: 'Tap to start your sleep audio.', data: { type: 'bedtime' } },
+        content: { title: 'Somni — Sleep', body: 'Time to sleep. Tap to start. Audio will not begin without it.', data: { type: 'bedtime' } },
         trigger: { type: SchedulableTriggerInputTypes.DAILY, hour: bh, minute: bm },
       });
       console.log('[Somni] step 6: calling scheduleNotificationAsync (wake)');
       await scheduleNotificationAsync({
-        content: { title: 'Somni — Wake', body: 'Tap to start your wake audio.', sound: 'default', data: { type: 'waketime' } },
+        content: { title: 'Somni — Wake', body: 'Good morning. Tap to see your intention.', sound: 'default', data: { type: 'waketime' } },
         trigger: { type: SchedulableTriggerInputTypes.DAILY, hour: wh, minute: wm },
       });
       console.log('[Somni] step 7: all scheduled, updating status');
@@ -484,6 +484,8 @@ const s = StyleSheet.create({
   wakeRule: { width: '100%', height: 1, backgroundColor: '#D8D2C8', marginBottom: 40 },
   wakeStatement: { fontFamily: 'CormorantGaramond_300Light', fontWeight: '300', fontSize: 26, color: '#0B0B0D', lineHeight: 38, letterSpacing: 0.5, textAlign: 'center', paddingHorizontal: 8 },
 });
+
+
 
 
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, SafeAreaView, StyleSheet, TouchableOpacity,
+  View, Text, ScrollView, SafeAreaView, StyleSheet, TouchableOpacity, Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -34,6 +34,7 @@ export default function LogScreen({ onBack }: Props) {
   const [diagLines,   setDiagLines]   = useState<string[]>([]);
   const [titleTaps,   setTitleTaps]   = useState(0);
   const [diagUnlocked, setDiagUnlocked] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<LogEntry | null>(null);
 
   function handleTitleTap() {
     const next = titleTaps + 1;
@@ -44,6 +45,11 @@ export default function LogScreen({ onBack }: Props) {
   }
 
   useEffect(() => {
+    loadEntries();
+    loadDiag();
+  }, []);
+
+  function loadEntries() {
     AsyncStorage.getItem(LOG_KEY)
       .then(raw => {
         if (!raw) return;
@@ -51,8 +57,7 @@ export default function LogScreen({ onBack }: Props) {
         setEntries(Array.isArray(p) ? p : []);
       })
       .catch(() => {});
-    loadDiag();
-  }, []);
+  }
 
   function loadDiag() {
     AsyncStorage.getItem(DIAG_LOG_KEY)
@@ -67,6 +72,63 @@ export default function LogScreen({ onBack }: Props) {
   function clearDiag() {
     AsyncStorage.setItem(DIAG_LOG_KEY, JSON.stringify([])).catch(() => {});
     setDiagLines([]);
+  }
+
+  function confirmDeleteEntry(entry: LogEntry) {
+    Alert.alert(
+      'Delete intention',
+      'This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => deleteEntry(entry) },
+      ]
+    );
+  }
+
+  function deleteEntry(entry: LogEntry) {
+    const updated = entries.filter(e => e.id !== entry.id);
+    setEntries(updated);
+    AsyncStorage.setItem(LOG_KEY, JSON.stringify(updated)).catch(() => {});
+    setSelectedEntry(null);
+  }
+
+  if (selectedEntry) {
+    return (
+      <SafeAreaView style={s.root}>
+        <StatusBar style="dark" />
+        <ScrollView contentContainerStyle={s.inner} showsVerticalScrollIndicator={false}>
+          <View style={s.headerRow}>
+            <Text style={s.title}>Intention</Text>
+            <TouchableOpacity onPress={() => setSelectedEntry(null)} activeOpacity={0.6} style={s.backWrap}>
+              <Text style={s.back}>← Back</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={s.rule} />
+          <Text style={s.detailDate}>{formatDate(selectedEntry.timestamp)}</Text>
+          {!!selectedEntry.text && <Text style={s.detailStatement}>{selectedEntry.text}</Text>}
+          {(!!selectedEntry.ans1 || !!selectedEntry.ans2) && (
+            <>
+              <View style={s.detailRule} />
+              {!!selectedEntry.ans1 && (
+                <>
+                  <Text style={s.detailLabel}>What you were committed to</Text>
+                  <Text style={s.detailAnswer}>{selectedEntry.ans1}</Text>
+                </>
+              )}
+              {!!selectedEntry.ans2 && (
+                <>
+                  <Text style={[s.detailLabel, { marginTop: 24 }]}>What was pulling you off it</Text>
+                  <Text style={s.detailAnswer}>{selectedEntry.ans2}</Text>
+                </>
+              )}
+            </>
+          )}
+          <TouchableOpacity onPress={() => confirmDeleteEntry(selectedEntry)} activeOpacity={0.6} style={s.deleteWrap}>
+            <Text style={s.deleteBtn}>Delete this intention</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -98,10 +160,10 @@ export default function LogScreen({ onBack }: Props) {
           ) : (
             entries.filter(Boolean).map((entry, i) => (
               <View key={entry.id}>
-                <View style={s.entry}>
+                <TouchableOpacity onPress={() => setSelectedEntry(entry)} activeOpacity={0.6} style={s.entry}>
                   <Text style={s.entryDate}>{formatDate(entry.timestamp)}</Text>
                   {!!entry.text && <Text style={s.entryText} numberOfLines={2}>{entry.text}</Text>}
-                </View>
+                </TouchableOpacity>
                 {i < entries.length - 1 && <View style={s.entryRule} />}
               </View>
             ))
@@ -151,4 +213,11 @@ const s = StyleSheet.create({
   diagCount: { fontFamily: 'Inter_300Light', fontWeight: '300', fontSize: 10, color: MID, letterSpacing: 1.5, textTransform: 'uppercase' },
   clearBtn: { fontFamily: 'Inter_300Light', fontWeight: '300', fontSize: 10, color: MID, letterSpacing: 1.5, textTransform: 'uppercase', textDecorationLine: 'underline' },
   diagLine: { fontFamily: 'Inter_300Light', fontWeight: '300', fontSize: 10, color: DARK, lineHeight: 17, letterSpacing: 0.2, marginBottom: 4 },
+  detailDate: { fontFamily: 'Inter_300Light', fontWeight: '300', fontSize: 11, color: MID, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 16 },
+  detailStatement: { fontFamily: 'CormorantGaramond_300Light', fontWeight: '300', fontSize: 28, color: DARK, lineHeight: 40, letterSpacing: 0.3 },
+  detailRule: { height: 1, backgroundColor: RULE, marginTop: 36, marginBottom: 28 },
+  detailLabel: { fontFamily: 'Inter_300Light', fontWeight: '300', fontSize: 11, color: MID, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
+  detailAnswer: { fontFamily: 'Inter_300Light', fontWeight: '300', fontSize: 16, color: DARK, lineHeight: 24 },
+  deleteWrap: { marginTop: 48, alignItems: 'center' },
+  deleteBtn: { fontFamily: 'Inter_300Light', fontWeight: '300', fontSize: 12, color: '#B33A3A', letterSpacing: 1, textTransform: 'uppercase', textDecorationLine: 'underline' },
 });

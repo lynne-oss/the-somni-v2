@@ -24,7 +24,9 @@ import {
 } from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File as EXFile, Paths } from 'expo-file-system';
+import Purchases from 'react-native-purchases';
 import Btn from './Btn';
+import PaywallScreen from './PaywallScreen';
 import { C } from './theme';
 import { LogEntry, LOG_KEY, DIAG_LOG_KEY } from './types';
 import { startBedtime, startMorning, stop } from 'somni-audio';
@@ -49,14 +51,24 @@ const REC_URI_KEY  = '@somni_rec';
 const BEDTIME_KEY  = '@somni_bed';
 const WAKETIME_KEY  = '@somni_wake';
 const STATEMENT_KEY = '@somni_statement';
+const FREQUENCY_KEY = '@somni_frequency';
+const ENTITLEMENT_ID = 'The Somni Pro';
 
 const NETLIFY_URL = 'https://thesomni.app/.netlify/functions/generate-intention';
 
 type SignalPhase = 'input' | 'loading' | 'result' | 'direct';
+type Frequency = 'delta' | 'alpha' | 'theta';
 
-function ts() {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}.${String(d.getMilliseconds()).padStart(3,'0')}`;
+function getFrequencyAsset(freq: string) {
+  if (freq === 'alpha') return require('./assets/audio/alpha.mp3');
+  if (freq === 'theta') return require('./assets/audio/theta.mp3');
+  return require('./assets/audio/delta.mp3');
+}
+
+function getFrequencyLabel(freq: string) {
+  if (freq === 'alpha') return 'Alpha';
+  if (freq === 'theta') return 'Theta';
+  return 'Delta';
 }
 
 setNotificationHandler({
@@ -83,6 +95,7 @@ export default function RecordScreen({ onShowLog }: Props) {
   const [bedtime,       setBedtime]       = useState('22:00');
   const [waketime,      setWaketime]      = useState('07:00');
   const [status,        setStatus]        = useState('Record your sleep audio to begin.');
+  const [frequency,     setFrequency]     = useState<Frequency>('delta');
 
   const [signalPhase,   setSignalPhase]   = useState<SignalPhase>('input');
   const [ans1,          setAns1]          = useState('');
@@ -90,13 +103,20 @@ export default function RecordScreen({ onShowLog }: Props) {
   const [statement,     setStatement]     = useState('');
   const [wakeStatement, setWakeStatement] = useState('');
 
+  const [isSubscribed,  setIsSubscribed]  = useState(false);
+  const [showPaywall,   setShowPaywall]   = useState(false);
+
   const recorder      = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
 
-  const genRef           = useRef(0);
   const lastPlayedRef    = useRef('');
   const isWakePlayingRef = useRef(false);
   const loopTypeRef      = useRef<'bedtime' | 'waketime' | null>(null);
+
+  async function selectFrequency(freq: Frequency) {
+    setFrequency(freq);
+    await AsyncStorage.setItem(FREQUENCY_KEY, freq).catch(() => {});
+  }
 
   async function stopPlayback() {
     await stop();
@@ -106,11 +126,73 @@ export default function RecordScreen({ onShowLog }: Props) {
     setStatus('Stopped.');
   }
 
+  async function checkSubscriptionStatus() {
+    try {
+      const customerInfo = await Purchases.getCustomerInfo();
+      const active = !!customerInfo.entitlements.active[ENTITLEMENT_ID];
+      setIsSubscribed(active);
+    } catch (e) {
+      console.log('[Somni] subscription check failed', String(e));
+    }
+  }
+
+  async function handleRecordPress() {
+    if (isRecording) {
+      toggleRecording();
+      return;
+    }
+    await checkSubscriptionStatus();
+    if (!isSubscribed) {
+      setShowPaywall(true);
+      return;
+    }
+    toggleRecording();
+  }
+
+  async function handleSubscribe(plan: 'monthly' | 'annual') {
+    try {
+      const offerings = await Purchases.getOfferings();
+      const pkg = offerings.current?.availablePackages.find(p =>
+        plan === 'annual' ? p.packageType === 'ANNUAL' : p.packageType === 'MONTHLY'
+      );
+      if (!pkg) {
+        Alert.alert('Not available yet', 'Subscriptions are being set up. Please try again shortly.');
+        return;
+      }
+      const { customerInfo } = await Purchases.purchasePackage(pkg);
+      const active = !!customerInfo.entitlements.active[ENTITLEMENT_ID];
+      setIsSubscribed(active);
+      if (active) setShowPaywall(false);
+    } catch (e: any) {
+      if (!e?.userCancelled) {
+        Alert.alert('Purchase failed', e?.message ?? 'Something went wrong. Please try again.');
+      }
+    }
+  }
+
+  async function handleRestore() {
+    try {
+      const customerInfo = await Purchases.restorePurchases();
+      const active = !!customerInfo.entitlements.active[ENTITLEMENT_ID];
+      setIsSubscribed(active);
+      if (active) {
+        setShowPaywall(false);
+        Alert.alert('Restored', 'Your subscription has been restored.');
+      } else {
+        Alert.alert('Nothing to restore', 'No active subscription was found for this Apple ID.');
+      }
+    } catch (e: any) {
+      Alert.alert('Restore failed', e?.message ?? 'Something went wrong. Please try again.');
+    }
+  }
+
   useEffect(() => {
     console.log('[Somni] RecordScreen useEffect mounted');
     let timer: ReturnType<typeof setInterval>;
     const mounted = { current: true };
     const lastResponsePromise = getLastNotificationResponseAsync();
+
+    checkSubscriptionStatus();
 
     const onResponse = addNotificationResponseReceivedListener(async (resp) => {
       console.log('[Somni] notif-response received, type:', resp.notification.request.content.data?.type);
@@ -119,8 +201,9 @@ export default function RecordScreen({ onShowLog }: Props) {
         const uri = await AsyncStorage.getItem(REC_URI_KEY);
         if (!uri) return;
         if (t === 'bedtime' && loopTypeRef.current === null) {
+          const savedFreq = (await AsyncStorage.getItem(FREQUENCY_KEY)) || 'delta';
           const { Asset } = await import('expo-asset');
-          const [asset] = await Asset.loadAsync(require('./assets/audio/delta.mp3'));
+          const [asset] = await Asset.loadAsync(getFrequencyAsset(savedFreq));
           startBedtime(uri, asset.localUri!);
           loopTypeRef.current = 'bedtime';
           setIsPlaying(true);
@@ -146,22 +229,24 @@ export default function RecordScreen({ onShowLog }: Props) {
         if (!granted) Alert.alert('Notifications disabled', 'Enable notifications for The Somni in iOS Settings.');
         const initMode = { allowsRecording: false, playsInSilentMode: true, shouldPlayInBackground: true, interruptionMode: 'doNotMix' as const };
         await setAudioModeAsync(initMode);
-        const [savedUri, savedBed, savedWake, savedStatement] = await Promise.all([
-          AsyncStorage.getItem(REC_URI_KEY), AsyncStorage.getItem(BEDTIME_KEY), AsyncStorage.getItem(WAKETIME_KEY), AsyncStorage.getItem(STATEMENT_KEY),
+        const [savedUri, savedBed, savedWake, savedStatement, savedFreq] = await Promise.all([
+          AsyncStorage.getItem(REC_URI_KEY), AsyncStorage.getItem(BEDTIME_KEY), AsyncStorage.getItem(WAKETIME_KEY), AsyncStorage.getItem(STATEMENT_KEY), AsyncStorage.getItem(FREQUENCY_KEY),
         ]);
         if (!mounted.current) return;
         if (savedUri) { setHasRecording(true); setStatus('Recording loaded. Ready to schedule.'); }
         if (savedBed)       setBedtime(savedBed);
         if (savedWake)      setWaketime(savedWake);
         if (savedStatement) setWakeStatement(savedStatement);
+        if (savedFreq === 'alpha' || savedFreq === 'theta' || savedFreq === 'delta') setFrequency(savedFreq);
         console.log('[Somni] checking lastResponsePromise');
         const lastResponse = await lastResponsePromise;
         console.log('[Somni] lastResponse type:', lastResponse?.notification.request.content.data?.type);
         if (!mounted.current) return;
         const launchType = lastResponse?.notification.request.content.data?.type as 'bedtime' | 'waketime' | undefined;
         if (launchType === 'bedtime' && savedUri && loopTypeRef.current === null) {
+          const launchFreq = (await AsyncStorage.getItem(FREQUENCY_KEY)) || 'delta';
           const { Asset } = await import('expo-asset');
-          const [asset] = await Asset.loadAsync(require('./assets/audio/delta.mp3'));
+          const [asset] = await Asset.loadAsync(getFrequencyAsset(launchFreq));
           startBedtime(savedUri, asset.localUri!);
           loopTypeRef.current = 'bedtime';
           setIsPlaying(true);
@@ -189,8 +274,9 @@ export default function RecordScreen({ onShowLog }: Props) {
             if (lastPlayedRef.current === hhmm) return;
             if (uri && hhmm === bed && loopTypeRef.current === null) {
               lastPlayedRef.current = hhmm;
+              const intervalFreq = (await AsyncStorage.getItem(FREQUENCY_KEY)) || 'delta';
               const { Asset } = await import('expo-asset');
-              const [asset] = await Asset.loadAsync(require('./assets/audio/delta.mp3'));
+              const [asset] = await Asset.loadAsync(getFrequencyAsset(intervalFreq));
               startBedtime(uri, asset.localUri!);
               loopTypeRef.current = 'bedtime';
               setIsPlaying(true);
@@ -217,8 +303,9 @@ export default function RecordScreen({ onShowLog }: Props) {
         const uri = await AsyncStorage.getItem(REC_URI_KEY);
         if (!uri) return;
         if (t === 'bedtime' && loopTypeRef.current === null) {
+          const receiveFreq = (await AsyncStorage.getItem(FREQUENCY_KEY)) || 'delta';
           const { Asset } = await import('expo-asset');
-          const [asset] = await Asset.loadAsync(require('./assets/audio/delta.mp3'));
+          const [asset] = await Asset.loadAsync(getFrequencyAsset(receiveFreq));
           startBedtime(uri, asset.localUri!);
           loopTypeRef.current = 'bedtime';
           setIsPlaying(true);
@@ -264,7 +351,7 @@ export default function RecordScreen({ onShowLog }: Props) {
         setWakeStatement(statement);
         setHasRecording(true);
         setStatus('Saved. Set your times above, then tap Schedule.');
-        const entry: LogEntry = { id: Date.now().toString(), timestamp: Date.now(), text: statement };
+        const entry: LogEntry = { id: Date.now().toString(), timestamp: Date.now(), text: statement, ans1, ans2 };
         const raw = await AsyncStorage.getItem(LOG_KEY).catch(() => null);
         const existing: LogEntry[] = raw ? JSON.parse(raw) : [];
         await AsyncStorage.setItem(LOG_KEY, JSON.stringify([entry, ...existing])).catch(() => {});
@@ -324,12 +411,12 @@ export default function RecordScreen({ onShowLog }: Props) {
       });
       console.log('[Somni] step 6: calling scheduleNotificationAsync (wake)');
       await scheduleNotificationAsync({
-        content: { title: 'Somni — Wake', body: 'Good morning. Tap to see your intention.', sound: 'default', data: { type: 'waketime' } },
+        content: { title: 'Somni — Reminder', body: 'Tap to see your intention.', sound: 'default', data: { type: 'waketime' } },
         trigger: { type: SchedulableTriggerInputTypes.DAILY, hour: wh, minute: wm },
       });
       console.log('[Somni] step 7: all scheduled, updating status');
-      setStatus(`Sleep ${bedtime} · Wake ${waketime}`);
-      Alert.alert('Scheduled', `Sleep ${bedtime}: intention + delta play for 8 min, both fade out by 12 min.\nMorning ${waketime}: tap the notification — plays 5 times then stops.`);
+      setStatus(`Start ${bedtime} · Wake ${waketime}`);
+      Alert.alert('Scheduled', `Start ${bedtime}: intention + ${getFrequencyLabel(frequency)} play for 12 min, fading from 8 min.\nReminder ${waketime}: tap the notification to see your intention.`);
     } catch (e: any) {
       const msg = e?.message ?? String(e) ?? 'Unknown error';
       console.log('[Somni] schedule() caught error at last step reached above:', msg);
@@ -368,6 +455,17 @@ export default function RecordScreen({ onShowLog }: Props) {
   function handleTryAgain() { setSignalPhase('input'); setStatement(''); setAns1(''); setAns2(''); }
 
   const recordLabel = isRecording ? 'Stop Recording' : signalPhase === 'result' ? 'Record in your voice' : 'Start Recording';
+
+  if (showPaywall) {
+    return (
+      <PaywallScreen
+        intentionPreview={statement}
+        onSubscribe={handleSubscribe}
+        onRestore={handleRestore}
+        onClose={() => setShowPaywall(false)}
+      />
+    );
+  }
 
   if (isWakePlaying) {
     return (
@@ -436,13 +534,55 @@ export default function RecordScreen({ onShowLog }: Props) {
             </TouchableOpacity>
           )}
           <View style={s.sectionRule} />
-          <Btn label={recordLabel} onPress={toggleRecording} />
-          <Text style={[s.label, { marginTop: 32 }]}>Sleep time</Text>
+          <Btn label={recordLabel} onPress={handleRecordPress} />
+
+          {hasRecording && (
+            <>
+              <Text style={[s.sectionHeading, { marginTop: 32 }]}>Choose your frequency</Text>
+              <TouchableOpacity
+                onPress={() => selectFrequency('delta')}
+                activeOpacity={0.7}
+                style={[s.freqRow, frequency === 'delta' && s.freqRowSelected]}
+              >
+                <View style={s.freqRowTop}>
+                  <Text style={[s.freqName, frequency === 'delta' && s.freqNameSelected]}>Delta</Text>
+                  <Text style={[s.freqHz, frequency === 'delta' && s.freqHzSelected]}>0.5–4 Hz</Text>
+                </View>
+                <Text style={[s.freqDesc, frequency === 'delta' && s.freqDescSelected]}>Your brain's deepest repair state. Use it while you sleep to physically heal and reset the subconscious overnight.</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => selectFrequency('alpha')}
+                activeOpacity={0.7}
+                style={[s.freqRow, frequency === 'alpha' && s.freqRowSelected]}
+              >
+                <View style={s.freqRowTop}>
+                  <Text style={[s.freqName, frequency === 'alpha' && s.freqNameSelected]}>Alpha</Text>
+                  <Text style={[s.freqHz, frequency === 'alpha' && s.freqHzSelected]}>8–12 Hz</Text>
+                </View>
+                <Text style={[s.freqDesc, frequency === 'alpha' && s.freqDescSelected]}>The gateway state — calm, alert, highly receptive. Use it while visualizing your goals or repeating your affirmation.</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => selectFrequency('theta')}
+                activeOpacity={0.7}
+                style={[s.freqRow, frequency === 'theta' && s.freqRowSelected]}
+              >
+                <View style={s.freqRowTop}>
+                  <Text style={[s.freqName, frequency === 'theta' && s.freqNameSelected]}>Theta</Text>
+                  <Text style={[s.freqHz, frequency === 'theta' && s.freqHzSelected]}>4–7 Hz</Text>
+                </View>
+                <Text style={[s.freqDesc, frequency === 'theta' && s.freqDescSelected]}>The subconscious doorway. Use it to release old emotional patterns and rewire deep-seated beliefs.</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          <Text style={[s.label, { marginTop: 32 }]}>Start time</Text>
           <TextInput value={bedtime} onChangeText={setBedtime} keyboardType="numbers-and-punctuation" placeholderTextColor={C.secondary} style={s.input} />
-          <Text style={[s.label, { marginTop: 20 }]}>Wake time</Text>
+          <Text style={[s.label, { marginTop: 20 }]}>Reminder time</Text>
+          <Text style={s.fieldHint}>You'll get a notification with your intention at this time.</Text>
           <TextInput value={waketime} onChangeText={setWaketime} keyboardType="numbers-and-punctuation" placeholderTextColor={C.secondary} style={s.input} />
           <View style={{ marginTop: 32 }}>
             <Btn label="Schedule Daily Playback" onPress={schedule} />
+            <Text style={s.safetyNote}>Not for use while driving or operating machinery.</Text>
           </View>
           <View style={{ marginTop: 12 }}>
             <Btn label="Stop Playback" onPress={stopPlayback} />
@@ -469,6 +609,8 @@ const s = StyleSheet.create({
   sectionRule: { height: 1, backgroundColor: C.border, marginTop: 36, marginBottom: 32 },
   sectionHeading: { fontFamily: 'Inter_300Light', fontWeight: '300', fontSize: 11, color: C.secondary, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 28 },
   label: { fontFamily: 'Inter_300Light', fontWeight: '300', fontSize: 11, color: C.secondary, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8, marginTop: 4 },
+  safetyNote: { fontFamily: 'Inter_300Light', fontWeight: '300', fontSize: 11, color: C.secondary, textAlign: 'center', marginTop: 12 },
+  fieldHint: { fontFamily: 'Inter_300Light', fontWeight: '300', fontSize: 12, color: C.secondary, marginBottom: 8, lineHeight: 17 },
   input: { fontFamily: 'Inter_300Light', fontWeight: '300', fontSize: 18, color: C.primary, borderWidth: 1, borderColor: C.border, borderRadius: 2, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: C.inputBg },
   signalInput: { fontFamily: 'Inter_300Light', fontWeight: '300', fontSize: 18, color: C.primary, borderWidth: 1, borderColor: C.border, borderRadius: 2, paddingVertical: 14, paddingHorizontal: 14, backgroundColor: C.inputBg, minHeight: 80, textAlignVertical: 'top' },
   skipWrap: { marginTop: 28, alignItems: 'center' },
@@ -483,10 +625,13 @@ const s = StyleSheet.create({
   wakeTitle: { fontFamily: 'CormorantGaramond_300Light', fontWeight: '300', fontSize: 42, color: '#0B0B0D', letterSpacing: 2, marginBottom: 20 },
   wakeRule: { width: '100%', height: 1, backgroundColor: '#D8D2C8', marginBottom: 40 },
   wakeStatement: { fontFamily: 'CormorantGaramond_300Light', fontWeight: '300', fontSize: 26, color: '#0B0B0D', lineHeight: 38, letterSpacing: 0.5, textAlign: 'center', paddingHorizontal: 8 },
+  freqRow: { borderWidth: 1, borderColor: C.border, backgroundColor: C.inputBg, borderRadius: 2, paddingVertical: 14, paddingHorizontal: 16, marginBottom: 10 },
+  freqRowSelected: { backgroundColor: C.btnBg, borderColor: C.btnBg },
+  freqRowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  freqName: { fontFamily: 'CormorantGaramond_300Light', fontWeight: '300', fontSize: 18, color: C.primary, letterSpacing: 0.5 },
+  freqNameSelected: { color: C.btnText },
+  freqHz: { fontFamily: 'Inter_300Light', fontWeight: '300', fontSize: 10, color: C.secondary, letterSpacing: 1 },
+  freqHzSelected: { color: C.btnText },
+  freqDesc: { fontFamily: 'Inter_300Light', fontWeight: '300', fontSize: 12, color: C.secondary, marginTop: 4 },
+  freqDescSelected: { color: C.btnText },
 });
-
-
-
-
-
-

@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import * as Font from 'expo-font';
+import Purchases from 'react-native-purchases';
 import RecordScreen from './RecordScreen';
 import LogScreen from './LogScreen';
 
-type Tab = 'main' | 'log';
+const REVENUECAT_API_KEY_IOS = 'test_uKRxeKRteBRopOeYcovQCkrUyJc';
 
+type Tab = 'main' | 'log';
 interface BoundaryProps { onBack: () => void; children: React.ReactNode; }
 interface BoundaryState { error: Error | null; }
-
 class LogErrorBoundary extends React.Component<BoundaryProps, BoundaryState> {
   state: BoundaryState = { error: null };
   static getDerivedStateFromError(error: Error): BoundaryState { return { error }; }
@@ -37,13 +38,11 @@ class LogErrorBoundary extends React.Component<BoundaryProps, BoundaryState> {
     return this.props.children;
   }
 }
-
-class RootErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { error: Error | null }
-> {
-  state = { error: null };
-  static getDerivedStateFromError(error: Error) { return { error }; }
+interface RootBoundaryProps { children: React.ReactNode; }
+interface RootBoundaryState { error: Error | null; }
+class RootErrorBoundary extends React.Component<RootBoundaryProps, RootBoundaryState> {
+  state: RootBoundaryState = { error: null };
+  static getDerivedStateFromError(error: Error): RootBoundaryState { return { error }; }
   render() {
     const { error } = this.state;
     if (error) {
@@ -63,19 +62,20 @@ class RootErrorBoundary extends React.Component<
     return this.props.children;
   }
 }
-
 export default function App() {
   const [tab, setTab] = useState<Tab>('main');
-
   useEffect(() => {
     Font.loadAsync({
       CormorantGaramond_300Light: require('./assets/CormorantGaramond_300Light.ttf'),
       Inter_300Light: require('./assets/Inter_300Light.ttf'),
     }).catch(() => {});
   }, []);
-
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      Purchases.configure({ apiKey: REVENUECAT_API_KEY_IOS });
+    }
+  }, []);
   const goBack = () => setTab('main');
-
   return (
     <RootErrorBoundary>
       <>
